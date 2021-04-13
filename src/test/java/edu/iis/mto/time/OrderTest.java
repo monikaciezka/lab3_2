@@ -19,18 +19,22 @@ import java.time.temporal.ChronoUnit;
 @ExtendWith(MockitoExtension.class)
 class OrderTest {
 
+    Instant submitInstant;
+    Instant confirmedAfterExpiredInstant;
+    Order order;
+
     @Mock
     private Clock mockClock;
 
     @BeforeEach
-    void setUp() throws Exception {}
+    void setUp() throws Exception {
+        submitInstant = Instant.parse("2007-12-03T10:15:30.00Z");
+        order = new Order(mockClock);
+    }
 
     @Test
     void expiredOrderExceptionTest() {
-        Order order = new Order(mockClock);
-
-        Instant submitInstant = Instant.parse("2007-12-03T10:15:30.00Z");
-        Instant confirmedAfterExpiredInstant = submitInstant.plus(Order.VALID_PERIOD_HOURS + 1, ChronoUnit.HOURS);
+        confirmedAfterExpiredInstant = submitInstant.plus(Order.VALID_PERIOD_HOURS + 1, ChronoUnit.HOURS);
 
         when(mockClock.getZone()).thenReturn(ZoneId.systemDefault());
         when(mockClock.instant()).thenReturn(submitInstant).thenReturn(confirmedAfterExpiredInstant);
@@ -44,11 +48,48 @@ class OrderTest {
     }
 
     @Test
-    void expiredOrderStatusTest() {}
+    void expiredOrderStatusTest() {
+        confirmedAfterExpiredInstant = submitInstant.plus(Order.VALID_PERIOD_HOURS + 1, ChronoUnit.HOURS);
+
+        when(mockClock.getZone()).thenReturn(ZoneId.systemDefault());
+        when(mockClock.instant()).thenReturn(submitInstant).thenReturn(confirmedAfterExpiredInstant);
+
+        order.submit();
+
+        try {
+            order.confirm();
+        } catch (OrderExpiredException e) {
+            assertEquals(order.getOrderState(), Order.State.CANCELLED);
+        }
+    }
 
     @Test
-    void notExpiredOrderExceptionTest() {}
+    void notExpiredOrderExceptionTest() {
+        confirmedAfterExpiredInstant = submitInstant.plus(Order.VALID_PERIOD_HOURS - 5, ChronoUnit.HOURS);
+
+        when(mockClock.getZone()).thenReturn(ZoneId.systemDefault());
+        when(mockClock.instant()).thenReturn(submitInstant).thenReturn(confirmedAfterExpiredInstant);
+
+        order.submit();
+
+        try {
+            order.confirm();
+        } catch (OrderExpiredException e) {
+            fail("OrderExpiredException was thrown, when order still valid");
+        }
+    }
 
     @Test
-    void notExpiredOrderStatusTest() {}
+    void notExpiredOrderStatusTest() {confirmedAfterExpiredInstant = submitInstant.plus(Order.VALID_PERIOD_HOURS - 5, ChronoUnit.HOURS);
+
+        when(mockClock.getZone()).thenReturn(ZoneId.systemDefault());
+        when(mockClock.instant()).thenReturn(submitInstant).thenReturn(confirmedAfterExpiredInstant);
+
+        order.submit();
+
+        try {
+            order.confirm();
+        } catch (OrderExpiredException e) {
+            assertEquals(order.getOrderState(), Order.State.CONFIRMED);
+        }}
 }
